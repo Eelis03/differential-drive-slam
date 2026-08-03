@@ -35,6 +35,14 @@ class StepRecord:
     num_landmarks: int
     associations: tuple[Association, ...]
     measurement_identities: tuple[int, ...]
+    #: Ground truth identity of the landmark each filter slot was initialised from,
+    #: as the slots stand at the end of this step. Recorded per step rather than once
+    #: per run because map management deletes slots and renumbers those above them,
+    #: so the final mapping does not describe the numbering earlier decisions used.
+    slot_identities: tuple[int, ...] = ()
+    #: Slots deleted by map management at this step, in the numbering that was in
+    #: force immediately before the deletion.
+    removed_landmarks: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,11 +105,30 @@ class Trace:
         """Final landmark marginal covariances, shaped (N, 2, 2)."""
         return self.final_state.landmark_covariances()
 
-    def associations(self) -> tuple[tuple[int, Association], ...]:
-        """Return every association paired with the true identity of its measurement."""
-        pairs: list[tuple[int, Association]] = []
+    @property
+    def removed_landmarks(self) -> int:
+        """Number of landmarks deleted by map management over the whole run."""
+        return sum(len(step.removed_landmarks) for step in self.steps)
+
+    def associations(self) -> tuple[tuple[int, int, Association], ...]:
+        """Return every association with the two identities needed to score it.
+
+        Each entry is ``(measurement identity, slot identity, association)``. The
+        first is the ground truth landmark that produced the measurement. The second
+        is the ground truth landmark occupying the slot the association assigned it
+        to, read from the step the decision was taken in, which is what makes the
+        score correct after map management has renumbered slots. It is ``-1`` when
+        the association carries no slot or the slot has no recorded identity.
+        """
+        pairs: list[tuple[int, int, Association]] = []
         for step in self.steps:
             for association in step.associations:
                 identity = step.measurement_identities[association.measurement_index]
-                pairs.append((identity, association))
+                slot = association.landmark_index
+                assigned = (
+                    step.slot_identities[slot]
+                    if slot is not None and slot < len(step.slot_identities)
+                    else -1
+                )
+                pairs.append((identity, assigned, association))
         return tuple(pairs)

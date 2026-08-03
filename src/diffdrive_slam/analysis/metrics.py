@@ -298,11 +298,10 @@ def association_summary(trace: Trace) -> AssociationSummary:
     initialised = 0
     rejected = 0
     incorrect = 0
-    for identity, association in trace.associations():
+    for identity, assigned, association in trace.associations():
         if association.kind is AssociationKind.MATCHED:
             matched += 1
-            slot = association.landmark_index
-            if slot is None or trace.slot_to_identity[slot] != identity:
+            if assigned != identity:
                 incorrect += 1
         elif association.kind is AssociationKind.NEW:
             initialised += 1

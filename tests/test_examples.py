@@ -19,10 +19,14 @@ INVOCATIONS = [
     ("run_data_association.py", ["--steps", "60", "--seeds", "2"]),
 ]
 
+#: The README figure script has no ``--no-figures`` mode, since figures are all it
+#: does, so it is invoked separately against a temporary directory.
+FIGURE_SCRIPT = "make_readme_figures.py"
+
 
 def test_every_example_is_covered() -> None:
     scripts = {path.name for path in EXAMPLES.glob("*.py")}
-    assert scripts == {name for name, _ in INVOCATIONS}
+    assert scripts == {name for name, _ in INVOCATIONS} | {FIGURE_SCRIPT}
 
 
 @pytest.mark.parametrize(("script", "arguments"), INVOCATIONS)
@@ -82,3 +86,28 @@ def test_occupancy_example_writes_its_figure(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stderr
     assert (tmp_path / "occupancy_grid.png").exists()
+
+
+def test_readme_figure_script_writes_exactly_the_published_set(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(EXAMPLES / FIGURE_SCRIPT),
+            "--steps",
+            "40",
+            "--runs",
+            "2",
+            "--output",
+            str(tmp_path),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    written = sorted(path.name for path in tmp_path.glob("*.png"))
+    published = sorted(path.name for path in (REPO_ROOT / "docs" / "figures").glob("*.png"))
+    assert written == published
+    assert "total" in result.stdout

@@ -103,6 +103,26 @@ class SlamState:
             blocks[index] = self.landmark_covariance(index)
         return blocks
 
+    def without_landmark(self, index: int) -> SlamState:
+        """Return the state with landmark ``index`` marginalised out.
+
+        Marginalising a jointly Gaussian variable out of a moment-form belief is
+        exactly the deletion of its rows and columns: the remaining block is already
+        the covariance of the marginal. No approximation is introduced and no
+        information about the surviving landmarks is lost, which is what makes a
+        delete operation safe in this parameterisation and expensive in the
+        information form, where it would require a Schur complement.
+        """
+        block = self.landmark_slice(index)
+        keep = np.ones(self.dimension, dtype=np.bool_)
+        keep[block] = False
+        return SlamState(
+            mean=np.asarray(self.mean[keep], dtype=np.float64).copy(),
+            covariance=np.asarray(
+                self.covariance[np.ix_(keep, keep)], dtype=np.float64
+            ).copy(),
+        )
+
     def copy(self) -> SlamState:
         """Return a deep copy of the state."""
         return SlamState(mean=self.mean.copy(), covariance=self.covariance.copy())

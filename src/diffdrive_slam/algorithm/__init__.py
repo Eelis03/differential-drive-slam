@@ -16,7 +16,12 @@ from diffdrive_slam.algorithm.association import (
     mahalanobis_squared,
     negative_log_likelihood,
 )
-from diffdrive_slam.algorithm.ekf_slam import EkfSlam, EkfSlamConfig, Innovation
+from diffdrive_slam.algorithm.ekf_slam import (
+    EkfSlam,
+    EkfSlamConfig,
+    Innovation,
+    MapManagement,
+)
 from diffdrive_slam.algorithm.occupancy import OccupancyGridMapper
 
 __all__ = [
@@ -26,6 +31,7 @@ __all__ = [
     "EkfSlam",
     "EkfSlamConfig",
     "Innovation",
+    "MapManagement",
     "OccupancyGridMapper",
     "associate",
     "chi_square_gate",

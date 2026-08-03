@@ -46,6 +46,8 @@ def main(argv: list[str] | None = None) -> int:
     nees_rows: list[np.ndarray] = []
     trajectory_rmse: list[float] = []
     landmark_rmse: list[float] = []
+    deleted = 0
+    surplus = 0
     times = np.zeros(0, dtype=np.float64)
 
     for index in range(args.runs):
@@ -65,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
                 trace.true_landmarks, trace.estimated_landmarks, trace.slot_to_identity
             ).rmse
         )
+        deleted += trace.removed_landmarks
+        surplus += trace.final_state.num_landmarks - trace.true_landmarks.shape[0]
 
     ensemble = np.mean(np.asarray(nees_rows, dtype=np.float64), axis=0)
     summary = consistency_summary(ensemble, samples_per_value=args.runs)
@@ -75,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"ATE position RMSE std [m]    {float(np.std(trajectory_rmse)):.4f}")
     print(f"landmark RMSE mean [m]       {float(np.mean(landmark_rmse)):.4f}")
     print(f"landmark RMSE std [m]        {float(np.std(landmark_rmse)):.4f}")
+    print(f"landmarks deleted            {deleted}")
+    print(f"surplus landmarks remaining  {surplus}")
     print(f"ensemble average NEES        {summary.average:.4f}")
     print(f"expected value               {summary.degrees_of_freedom}")
     print(

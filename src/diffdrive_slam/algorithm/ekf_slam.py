@@ -18,13 +18,19 @@ inverse sensor model evaluated at the current pose estimate, and its covariance
 inherits the pose uncertainty through the inverse model Jacobians, which is what
 keeps the new landmark correlated with the robot and with the rest of the map.
 
+A fourth operation, removal, deletes a landmark that the association policy created
+in error. It is the marginalisation of a jointly Gaussian variable, which in moment
+form is the deletion of two rows and two columns, so the belief left over the
+survivors is exact. See :class:`MapManagement` for the rule that decides when it
+fires.
+
 Reference: Thrun, Burgard, and Fox, Probabilistic Robotics, chapter 10.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -52,12 +58,51 @@ from diffdrive_slam.model.sensor import (
     RangeBearingParams,
     inverse_observation,
     inverse_observation_jacobians,
+    is_visible,
     observation_jacobians,
     observe,
 )
 from diffdrive_slam.model.state import SlamState
 
-__all__ = ["EkfSlam", "EkfSlamConfig", "Innovation"]
+__all__ = ["EkfSlam", "EkfSlamConfig", "Innovation", "MapManagement"]
+
+
+@dataclass(frozen=True, slots=True)
+class MapManagement:
+    """Rule that deletes landmarks the association policy created in error.
+
+    A landmark is provisional until it has been matched ``confirm_after`` times.
+    While it is provisional, every batch in which the filter predicts it to lie
+    inside the sensor footprint and no measurement is assigned to it counts as a
+    miss, and exceeding ``misses_allowed`` misses deletes it. A confirmed landmark
+    is never deleted, because a landmark seen that often is supported by evidence
+    that a run of missed detections should not overturn.
+
+    The asymmetry is deliberate. A spurious landmark is created by a single outlying
+    measurement and is then contradicted at every subsequent step, because the real
+    landmark that produced the outlier explains the following measurements better.
+    A real landmark is contradicted only when its measurements are being lost, which
+    the two thresholds together make unlikely to happen ``misses_allowed`` times in a
+    row before ``confirm_after`` matches have accumulated.
+
+    ``range_margin`` scales the sensor maximum range down before the visibility test.
+    A landmark sitting on the range boundary is expected to be detected
+    intermittently, so counting those steps as misses would delete correct landmarks
+    at the edge of the footprint.
+    """
+
+    enabled: bool = True
+    confirm_after: int = 5
+    misses_allowed: int = 3
+    range_margin: float = 0.9
+
+    def __post_init__(self) -> None:
+        if self.confirm_after < 1:
+            raise ValueError(f"confirm_after must be at least 1, got {self.confirm_after}")
+        if self.misses_allowed < 1:
+            raise ValueError(f"misses_allowed must be at least 1, got {self.misses_allowed}")
+        if not 0.0 < self.range_margin <= 1.0:
+            raise ValueError(f"range_margin must lie in (0, 1], got {self.range_margin}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +115,10 @@ class EkfSlamConfig:
     acceptance_confidence: float = 0.99
     #: Chi-square confidence above which a measurement initialises a new landmark.
     new_landmark_confidence: float = 0.9999
+    #: Rule that removes unsupported landmarks. Applied only when correspondences
+    #: are recovered from the measurements, since the known correspondence mode
+    #: bypasses association and therefore has nothing to correct.
+    map_management: MapManagement = field(default_factory=MapManagement)
 
     def __post_init__(self) -> None:
         if not 0.0 < self.acceptance_confidence < 1.0:
@@ -110,11 +159,32 @@ class EkfSlam:
         self._state = SlamState.initial(initial_pose, initial_covariance)
         self._measurement_covariance = self._config.sensor.covariance()
         self._identity_to_index: dict[int, int] = {}
+        self._hits: list[int] = []
+        self._misses: list[int] = []
+        self._removals: tuple[int, ...] = ()
+        self._footprint = replace(
+            self._config.sensor,
+            max_range=self._config.map_management.range_margin * self._config.sensor.max_range,
+        )
 
     @property
     def config(self) -> EkfSlamConfig:
         """The configuration this filter was built with."""
         return self._config
+
+    @property
+    def last_removals(self) -> tuple[int, ...]:
+        """Landmark slots deleted during the most recent :meth:`integrate` call.
+
+        The indices are ascending and refer to the numbering in force before the
+        deletion, so a caller holding its own per-slot bookkeeping can replay them
+        to renumber it. Deleting a slot shifts every higher slot down by one.
+        """
+        return self._removals
+
+    def observation_counts(self) -> tuple[tuple[int, int], ...]:
+        """Return ``(hits, misses)`` per landmark slot, in slot order."""
+        return tuple(zip(self._hits, self._misses, strict=True))
 
     @property
     def state(self) -> SlamState:
@@ -212,7 +282,24 @@ class EkfSlam:
         )
 
         self._state = SlamState(mean=mean, covariance=symmetrise(covariance))
+        self._hits.append(0)
+        self._misses.append(0)
         return self._state.num_landmarks - 1
+
+    def remove_landmark(self, index: int) -> None:
+        """Marginalise landmark ``index`` out of the belief.
+
+        Every slot above ``index`` moves down by one, and any identity mapping the
+        caller keeps must be renumbered to match.
+        """
+        self._state = self._state.without_landmark(index)
+        del self._hits[index]
+        del self._misses[index]
+        self._identity_to_index = {
+            identity: slot - 1 if slot > index else slot
+            for identity, slot in self._identity_to_index.items()
+            if slot != index
+        }
 
     def evaluate_candidates(self, measurement: FloatArray) -> list[Candidate]:
         """Score ``measurement`` against every landmark currently in the state."""
@@ -243,15 +330,53 @@ class EkfSlam:
         ``correspondences`` is given it supplies the true landmark identity of every
         measurement and data association is bypassed, which is the reference mode
         used to separate filter error from association error.
+
+        The landmark indices carried by the returned associations refer to the state
+        as it stands when the call returns. Map management runs before the batch is
+        processed, so any deletion is reported by :attr:`last_removals` and the
+        indices are already expressed in the renumbered state.
         """
         if measurements.ndim != 2 or measurements.shape[1] != MEASUREMENT_DIM:
             raise ValueError(f"measurements must have shape (K, 2), got {measurements.shape}")
         if correspondences is not None and len(correspondences) != measurements.shape[0]:
             raise ValueError("correspondences must have one entry per measurement")
 
+        self._removals = ()
         if correspondences is not None:
             return self._integrate_known(measurements, correspondences)
         return self._integrate_unknown(measurements)
+
+    def _prune(self) -> tuple[int, ...]:
+        """Delete every provisional landmark that has run out of misses."""
+        policy = self._config.map_management
+        if not policy.enabled:
+            return ()
+        doomed = tuple(
+            index
+            for index in range(self._state.num_landmarks)
+            if self._hits[index] < policy.confirm_after
+            and self._misses[index] > policy.misses_allowed
+        )
+        for index in reversed(doomed):
+            self.remove_landmark(index)
+        return doomed
+
+    def _record_observations(self, observed: set[int]) -> None:
+        """Credit a hit to every landmark seen and a miss to every one expected.
+
+        Expectation is evaluated at the corrected pose, which is the best estimate of
+        where the robot was when the batch was taken. The deletion it may trigger is
+        applied at the start of the next batch rather than here, so that the indices
+        the caller has just been handed stay valid.
+        """
+        if not self._config.map_management.enabled:
+            return
+        pose = self._state.robot_pose
+        for index in range(self._state.num_landmarks):
+            if index in observed:
+                self._hits[index] += 1
+            elif is_visible(pose, self._state.landmark(index), self._footprint):
+                self._misses[index] += 1
 
     def _integrate_known(
         self, measurements: FloatArray, correspondences: Sequence[int]
@@ -281,9 +406,11 @@ class EkfSlam:
         return tuple(results)
 
     def _integrate_unknown(self, measurements: FloatArray) -> tuple[Association, ...]:
+        self._removals = self._prune()
         acceptance = self._config.acceptance_gate
         initialisation = self._config.new_landmark_gate
         results: list[Association] = []
+        observed: set[int] = set()
         for row in range(measurements.shape[0]):
             measurement = np.asarray(measurements[row], dtype=np.float64)
             decision = associate(
@@ -294,9 +421,11 @@ class EkfSlam:
             )
             if decision.kind is AssociationKind.MATCHED and decision.landmark_index is not None:
                 self.update(measurement, decision.landmark_index)
+                observed.add(decision.landmark_index)
                 results.append(decision)
             elif decision.kind is AssociationKind.NEW:
                 index = self.augment(measurement)
+                observed.add(index)
                 results.append(
                     Association(
                         measurement_index=row,
@@ -307,4 +436,5 @@ class EkfSlam:
                 )
             else:
                 results.append(decision)
+        self._record_observations(observed)
         return tuple(results)

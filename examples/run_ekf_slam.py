@@ -51,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"matched                      {result.associations.matched}")
     print(f"initialised                  {result.associations.initialised}")
     print(f"rejected as ambiguous        {result.associations.rejected}")
+    print(f"deleted by map management    {trace.removed_landmarks}")
     print(f"incorrect matches            {result.associations.incorrect}")
     print(f"association accuracy         {result.associations.accuracy:.4f}")
     print(f"time averaged NEES           {summary.average:.4f}")

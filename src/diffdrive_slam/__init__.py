@@ -25,6 +25,7 @@ from diffdrive_slam.algorithm import (
     AssociationKind,
     EkfSlam,
     EkfSlamConfig,
+    MapManagement,
     OccupancyGridMapper,
 )
 from diffdrive_slam.analysis import Evaluation, evaluate
@@ -50,6 +51,7 @@ __all__ = [
     "Evaluation",
     "GridSpec",
     "LogOddsParams",
+    "MapManagement",
     "MotionNoise",
     "OccupancyGridMapper",
     "RangeBearingParams",

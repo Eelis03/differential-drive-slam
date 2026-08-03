@@ -20,12 +20,13 @@ which would prevent the two example scripts from reporting the same run.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
 
 from diffdrive_slam.algorithm.association import AssociationKind
-from diffdrive_slam.algorithm.ekf_slam import EkfSlam, EkfSlamConfig
+from diffdrive_slam.algorithm.ekf_slam import EkfSlam, EkfSlamConfig, MapManagement
 from diffdrive_slam.algorithm.occupancy import OccupancyGridMapper
 from diffdrive_slam.model.arrays import FloatArray, wrap_angles
 from diffdrive_slam.model.grid import GridSpec, LogOddsParams
@@ -68,6 +69,7 @@ class SimulationConfig:
     motion_noise: MotionNoise = field(default_factory=MotionNoise)
     sensor: RangeBearingParams = field(default_factory=RangeBearingParams)
     known_correspondence: bool = False
+    map_management: MapManagement = field(default_factory=MapManagement)
 
     #: Leave as ``None`` to start where the closed loop is centred on the origin.
     initial_pose: tuple[float, float, float] | None = None
@@ -114,6 +116,20 @@ def _sample_control(rng: np.random.Generator, control: Control, noise: MotionNoi
     )
 
 
+def _renumber(mapping: dict[int, int], removed: Sequence[int]) -> dict[int, int]:
+    """Apply the slot deletions in ``removed`` to a slot to identity mapping.
+
+    Deleting a slot shifts every higher slot down by one, so a slot that survives
+    loses one position for each deleted slot below it.
+    """
+    dropped = set(removed)
+    return {
+        slot - sum(1 for gone in dropped if gone < slot): identity
+        for slot, identity in mapping.items()
+        if slot not in dropped
+    }
+
+
 def run_simulation(
     config: SimulationConfig | None = None, environment: Environment | None = None
 ) -> Trace:
@@ -148,7 +164,11 @@ def run_simulation(
     true_pose[2] = float(wrap_angles(np.asarray([true_pose[2]]))[0])
     dead_reckoned = nominal_pose.copy()
 
-    filter_config = EkfSlamConfig(motion_noise=settings.motion_noise, sensor=settings.sensor)
+    filter_config = EkfSlamConfig(
+        motion_noise=settings.motion_noise,
+        sensor=settings.sensor,
+        map_management=settings.map_management,
+    )
     slam = EkfSlam(nominal_pose, initial_covariance, filter_config)
 
     mapper = (
@@ -197,6 +217,9 @@ def run_simulation(
         )
         associations = slam.integrate(measurements, correspondences)
 
+        removed = slam.last_removals
+        if removed:
+            slot_to_identity = _renumber(slot_to_identity, removed)
         for association in associations:
             if association.kind is AssociationKind.NEW and association.landmark_index is not None:
                 identity = int(identities[association.measurement_index])
@@ -224,6 +247,10 @@ def run_simulation(
                 num_landmarks=slam.num_landmarks,
                 associations=associations,
                 measurement_identities=tuple(int(value) for value in identities),
+                slot_identities=tuple(
+                    slot_to_identity.get(slot, -1) for slot in range(slam.num_landmarks)
+                ),
+                removed_landmarks=removed,
             )
         )
 

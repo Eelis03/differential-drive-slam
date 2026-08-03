@@ -85,6 +85,11 @@ which wastes state and can later attract the correct measurements away from the 
 landmark. On the default scenario the rule discards 0.93 percent of detections and makes
 no incorrect assignment across 20407 detections.
 
+The duplicate that discarding was chosen to avoid is now also cleaned up after the fact,
+by the deletion rule described under closed limitations below. The two are complementary:
+the gate refuses to guess at association time, and map management removes the landmarks
+that a wrong guess would have created anyway.
+
 ### Occupancy grid mapping
 
 The grid uses the recursive log-odds update of Moravec and Elfes (1985), with the
@@ -187,14 +192,14 @@ would at best be recovered, not corrected. It becomes the right choice when the 
 density rises relative to the sensor resolution, which is the condition under which this
 repository's association policy degrades.
 
-### Landmark deletion and map management
+### Joint compatibility as a map management substitute
 
-A quality counter per landmark, deleting landmarks that are observed less often than
-expected, would have removed the roughly one spurious landmark per run that the maximum
-likelihood policy creates. It was rejected as scope: it introduces a state removal
-operation whose interaction with the covariance and with the recorded slot to identity
-mapping needs its own tests, and the spurious landmarks are counted and reported rather
-than hidden.
+Resolving ambiguity at association time rather than deleting afterwards is the other
+way to keep duplicates out of the map. It is the same rejection as the entry above:
+the joint test is exponential in the batch size without careful pruning, and the
+individual gate already achieves a perfect association record here. Deletion was the
+cheaper way to reach the same map, and it is recorded in the closed limitations below
+along with what it cost.
 
 ### Scan matching for the occupancy grid
 
@@ -204,6 +209,83 @@ it would make the grid a second, independent localisation system, so the grid wo
 longer measure what it is here to measure, which is what a map built on top of this
 filter's pose estimate actually looks like. The tolerance sweep in the README exists to
 make that error visible rather than to hide it.
+
+## Closed limitations
+
+### Landmarks are never removed
+
+**Closed.** This section previously recorded that there was no delete operation, so a
+landmark initialised from a spurious detection stayed in the state for the rest of the
+run, cost a row and a column in the covariance forever, and could attract correct
+measurements away from the real landmark it duplicated. The maximum likelihood runs
+ended with 20.4 landmarks on average against a true count of 20. Closing it needed a
+per-landmark quality statistic, a removal rule, and a covariance row and column
+deletion, together with tests showing the remaining state is still a valid Gaussian.
+All three now exist.
+
+**What the deletion does.** `SlamState.without_landmark` removes the two rows and two
+columns of the landmark from the mean and the covariance. For a moment-form Gaussian
+that is exactly marginalisation, so the belief left over the survivors is the true
+marginal and every cross correlation among them is untouched. No approximation enters,
+which is the reason a delete operation is cheap in this parameterisation and awkward in
+the information form, where the same operation is a Schur complement that fills in the
+matrix.
+
+**The rule that fires it.** `MapManagement` keeps two counters per landmark. A landmark
+is provisional until it has been matched `confirm_after` times, five by default. While
+provisional, each measurement batch in which the filter predicts it to lie inside the
+sensor footprint and assigns it nothing counts as a miss, and exceeding
+`misses_allowed`, three by default, deletes it. A confirmed landmark is never deleted.
+The visibility test uses `range_margin`, 0.9 by default, of the sensor maximum range,
+so a landmark on the range boundary, where intermittent detection is expected, is not
+charged misses for behaviour the sensor model predicts.
+
+The asymmetry is what makes the rule safe here. A spurious landmark is created by a
+single outlying measurement and is then contradicted at every following step, because
+the real landmark that produced the outlier explains the following measurements better.
+A real landmark is contradicted only when its measurements are being lost. Deletion is
+also confined to the unknown correspondence path: the known correspondence mode bypasses
+association entirely, so there is nothing there for map management to correct, and
+running it would only risk deleting a landmark the caller has vouched for.
+
+**What it cost.**
+
+- Two counters per landmark, and a slot renumbering contract. Deleting slot `k` shifts
+  every slot above it down by one. `EkfSlam.last_removals` reports the deletions of the
+  most recent batch so that a caller keeping its own per-slot bookkeeping can replay
+  them, and the deletion is applied at the start of the next batch rather than at the
+  end of the current one, so the indices a caller has just been handed stay valid.
+- A change to how association accuracy is scored. The metric previously compared the
+  slot an association chose against the final slot to identity mapping, which is correct
+  only while slots are append-only. After a deletion the final mapping no longer
+  describes the numbering that earlier decisions were made in, and the metric would have
+  reported false incorrect associations. `StepRecord` now carries the mapping as it
+  stood at each step, and `association_summary` reads it from the step the decision was
+  taken in. This is a strict generalisation: with deletion disabled the two agree.
+- Memory in the trace, one integer per slot per step, which at 20 landmarks and 640
+  steps is negligible.
+- Two thresholds and a margin that are tuned rather than inferred. They are exposed as
+  parameters and the whole rule can be switched off with `MapManagement(enabled=False)`,
+  which is what the third row of the data association study does.
+
+**What it bought.** Over five seeds the policy deletes three landmarks and every run
+ends with exactly 20, against 20.4 on average with deletion disabled. Because a surplus
+slot is scored as map error, the landmark RMSE falls from 0.1052 m to 0.0946 m, close to
+the 0.0937 m that known correspondences achieve. Trajectory error is unchanged at
+0.1007 m, which is the expected result: a duplicate landmark is a wasted state, not a
+wrong one, and the filter was never being pulled by it.
+
+**What remains open.** The rule is a heuristic, not an inference. Over the 20 seeds of
+the consistency study it deletes 12 landmarks and one surplus landmark still survives to
+the end of its run, because that duplicate accumulated five matches and was confirmed
+before anything contradicted it. Raising `confirm_after` would keep it provisional long
+enough to catch, at the cost of leaving every real landmark deletable for longer, which
+is the wrong trade in the sparser parts of a map. Nor does the rule merge: a duplicate it
+does delete is deleted, not folded into the landmark it duplicates, so the observations
+that went into it are thrown away rather than transferred. The principled fix is not a
+better counter but a likelihood ratio between the hypothesis that a slot is a distinct
+landmark and the hypothesis that it duplicates a neighbour, together with a merge
+operation. That is a larger change than this one and is not implemented.
 
 ## Known limitations
 
@@ -222,7 +304,7 @@ blocks alone.
 
 Where that becomes binding, with the numbers from this repository: the default scenario
 has 20 landmarks, a 43 by 43 covariance, roughly 6.3 measurements per step, and completes
-640 steps in about 2 seconds. The quadratic term is invisible at that size. It becomes
+640 steps in under 3 seconds. The quadratic term is invisible at that size. It becomes
 the limit at a few hundred landmarks, where the covariance passes several megabytes and
 a single step costs more than the 0.1 s the step represents, so the filter can no longer
 run in real time on the trajectory it is estimating. At a few thousand landmarks the
@@ -240,8 +322,8 @@ smoothing keeps the sparsity exactly and pays for it with a factorisation.
 
 ### The consistency verdict is configuration-specific
 
-The Monte Carlo study reports an ensemble average NEES of 2.91 against an expected 3,
-with 97.5 percent of time steps inside the per-step 95 percent interval against a nominal
+The Monte Carlo study reports an ensemble average NEES of 2.90 against an expected 3,
+with 96.9 percent of time steps inside the per-step 95 percent interval against a nominal
 95 percent. That is consistent, marginally on the conservative side. This is not a
 general property of EKF-SLAM, and it should not be read as a refutation of the
 inconsistency results in the literature. Three features of the default scenario push the
@@ -254,16 +336,6 @@ error. Reducing the landmark density, increasing the bearing noise, or lengtheni
 interval between loop closures should move the verdict towards optimistic, which is the
 direction that Julier and Uhlmann (2001) and Bailey et al. (2006) predict and the
 direction that matters for safety.
-
-### Landmarks are never removed
-
-There is no delete operation. A landmark initialised from a spurious detection stays in
-the state for the rest of the run, costs a row and a column in the covariance forever,
-and can attract correct measurements away from the real landmark it duplicates. The
-maximum likelihood runs end with 20.4 landmarks on average against a true count of 20.
-Removing this needs a per-landmark quality statistic, a removal rule, and a covariance
-row and column deletion, together with the tests that show the remaining state is still a
-valid Gaussian.
 
 ### The heading is treated as a real number
 

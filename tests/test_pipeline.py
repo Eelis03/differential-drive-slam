@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from itertools import pairwise
+
 import numpy as np
 import pytest
 
+from diffdrive_slam.algorithm.association import AssociationKind
 from diffdrive_slam.model.grid import GridSpec
 from diffdrive_slam.model.motion import Control
 from diffdrive_slam.model.sensor import RangeBearingParams, observe
@@ -201,10 +204,18 @@ def test_trace_records_the_grid_when_requested(short_trace: Trace) -> None:
     assert short_trace.occupancy_log_odds.shape == short_trace.grid.shape
 
 
-def test_landmark_count_never_decreases(short_trace: Trace) -> None:
+def test_landmark_count_moves_only_by_recorded_decisions(short_trace: Trace) -> None:
+    """Every change in the map size is explained by an initialisation or a deletion."""
     counts = short_trace.landmark_counts
-    assert bool(np.all(np.diff(counts) >= 0))
     assert int(counts[-1]) == short_trace.final_state.num_landmarks
+    for previous, step in pairwise(short_trace.steps):
+        created = sum(
+            1
+            for association in step.associations
+            if association.kind is AssociationKind.NEW
+        )
+        removed = len(step.removed_landmarks)
+        assert step.num_landmarks == previous.num_landmarks + created - removed
 
 
 def test_every_estimated_landmark_carries_an_identity(short_trace: Trace) -> None:

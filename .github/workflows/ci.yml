@@ -29,8 +29,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      # The measured figure is 99 percent. The gate is set two points below the
+      # measured value rounded down, so an unrelated change cannot fail the build
+      # over a single uncovered line, while a module landing untested still does.
+      #
+      # Nothing here compares the committed figures in docs/figures against freshly
+      # generated ones. Matplotlib output is not byte reproducible across platforms,
+      # so a byte comparison would fail on the operating system it was not recorded
+      # on. The example script that writes them is exercised by the test suite, and
+      # the tracked set is checked against its byte budget there.
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run pytest -q --cov=src/diffdrive_slam --cov-report=term-missing --cov-fail-under=97
 
       - name: Lint
         run: uv run ruff check .

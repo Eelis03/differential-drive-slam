@@ -68,7 +68,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_figures:
         from diffdrive_slam.analysis.figures import plot_occupancy_grid, save_figure
 
-        save_figure(plot_occupancy_grid(trace), args.output / "occupancy_grid.png")
+        save_figure(
+            plot_occupancy_grid(trace, environment.walls), args.output / "occupancy_grid.png"
+        )
         print(f"figures written to           {args.output}")
 
     return 0

@@ -174,8 +174,14 @@ def plot_nees(times: FloatArray, nees: FloatArray, summary: ConsistencySummary) 
     return figure
 
 
-def plot_occupancy_grid(trace: Trace) -> Figure:
-    """Plot the accumulated occupancy grid with the trajectory drawn over it."""
+def plot_occupancy_grid(trace: Trace, walls: FloatArray | None = None) -> Figure:
+    """Plot the accumulated occupancy grid with the trajectory drawn over it.
+
+    ``walls`` is the ground truth wall segment array of the environment, shaped
+    (K, 4) as ``[x0, y0, x1, y1]``. Drawing it over the grid is what turns the figure
+    into a comparison: the reader can see where the estimated occupancy sits relative
+    to the surfaces that produced it, which no aggregate agreement number conveys.
+    """
     if trace.grid is None or trace.occupancy_log_odds is None:
         raise ValueError("the trace does not carry an occupancy grid")
 
@@ -190,6 +196,17 @@ def plot_occupancy_grid(trace: Trace) -> Figure:
         vmax=1.0,
         interpolation="nearest",
     )
+    if walls is not None:
+        for index, segment in enumerate(np.asarray(walls, dtype=np.float64)):
+            axes.plot(
+                [float(segment[0]), float(segment[2])],
+                [float(segment[1]), float(segment[3])],
+                color="tab:red",
+                lw=1.0,
+                ls="--",
+                alpha=0.9,
+                label="true walls" if index == 0 else None,
+            )
     true_poses = trace.true_poses
     axes.plot(true_poses[:, 0], true_poses[:, 1], color="tab:green", lw=1.2, label="ground truth")
     estimated = trace.estimated_poses
@@ -204,9 +221,16 @@ def plot_occupancy_grid(trace: Trace) -> Figure:
     return figure
 
 
-def save_figure(figure: Figure, path: Path) -> Path:
-    """Write ``figure`` to ``path``, creating the parent directory if needed."""
+def save_figure(figure: Figure, path: Path, dpi: int = 140) -> Path:
+    """Write ``figure`` to ``path``, creating the parent directory if needed.
+
+    ``dpi`` is exposed because the figures published in the README share a fixed byte
+    budget, and resolution is the only lever that trades file size against legibility
+    without pulling in an image compression dependency.
+    """
+    if dpi <= 0:
+        raise ValueError(f"dpi must be positive, got {dpi}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(path, dpi=140)
+    figure.savefig(path, dpi=dpi)
     plt.close(figure)
     return path
