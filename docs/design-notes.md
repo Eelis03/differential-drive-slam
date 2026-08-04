@@ -130,6 +130,18 @@ NEES samples within a run are strongly correlated and treating them as independe
 produces an interval far tighter than the evidence supports. Both intervals are printed,
 and the reports state which one the verdict rests on.
 
+The map is scored the same way, with the two-dimensional error of each landmark taken
+against the 2 by 2 marginal the filter reports for its slot, following Bailey et al.
+(2006). The marginal was chosen over the joint block across the whole map for two
+reasons. The joint form yields one number per run rather than one per landmark, so the
+Monte Carlo count alone sets the sample size; and the failure worth catching is a single
+slot whose ellipse is too small to hold its own error, which a joint number averages
+away. The cost is that the correlations between landmarks are not tested at all, so an
+inconsistency living only in the cross blocks would not show up here. Within one run the
+landmark samples are correlated for the same reason the time samples of a run are, since
+every landmark inherits the pose error that placed it, so the pooled interval over a map
+is printed and not used as the test.
+
 ## Rejected alternatives
 
 ### FastSLAM and Rao-Blackwellised particle filters

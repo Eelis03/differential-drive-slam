@@ -13,10 +13,14 @@ from diffdrive_slam.analysis.metrics import (
     evaluate,
     grid_summary,
     landmark_error,
+    landmark_nees,
+    map_consistency_summary,
     nees_bounds,
     pose_errors,
     pose_nees,
 )
+from diffdrive_slam.model.sensor import RangeBearingParams
+from diffdrive_slam.pipeline.simulate import SimulationConfig, run_simulation
 from diffdrive_slam.pipeline.trace import Trace
 
 
@@ -79,6 +83,42 @@ def test_nees_shapes_are_validated() -> None:
         pose_nees(np.zeros((2, 3)), np.zeros((2, 3)), np.zeros((3, 3, 3)))
 
 
+def test_landmark_nees_of_a_unit_covariance_is_the_squared_error() -> None:
+    truth = np.array([[0.0, 0.0], [4.0, 0.0]])
+    estimate = np.array([[0.3, 0.4], [4.0, 0.0]])
+    covariances = np.stack([np.eye(2), np.eye(2)])
+    values = landmark_nees(truth, estimate, covariances, (0, 1))
+    assert values.shape == (2,)
+    assert float(values[0]) == pytest.approx(0.25)
+    assert float(values[1]) == pytest.approx(0.0)
+
+
+def test_landmark_nees_scales_inversely_with_the_reported_covariance() -> None:
+    """A filter that halves the ellipse it reports quadruples the NEES it earns."""
+    truth = np.zeros((1, 2))
+    estimate = np.array([[0.1, 0.2]])
+    honest = np.eye(2)[None, :, :]
+    values = landmark_nees(truth, estimate, honest, (0,))
+    tightened = landmark_nees(truth, estimate, 0.25 * honest, (0,))
+    assert float(tightened[0]) == pytest.approx(4.0 * float(values[0]))
+
+
+def test_landmark_nees_skips_slots_with_no_identity() -> None:
+    truth = np.array([[0.0, 0.0]])
+    estimate = np.array([[0.0, 0.0], [9.0, 9.0]])
+    covariances = np.stack([np.eye(2), np.eye(2)])
+    values = landmark_nees(truth, estimate, covariances, (0, -1))
+    assert values.shape == (1,)
+
+
+def test_landmark_nees_shapes_are_validated() -> None:
+    covariances = np.stack([np.eye(2), np.eye(2)])
+    with pytest.raises(ValueError, match="one entry per estimated landmark"):
+        landmark_nees(np.zeros((2, 2)), np.zeros((2, 2)), covariances, (0,))
+    with pytest.raises(ValueError, match="shape"):
+        landmark_nees(np.zeros((2, 2)), np.zeros((2, 2)), np.zeros((2, 3, 3)), (0, 1))
+
+
 def test_nees_bounds_bracket_the_expected_value() -> None:
     lower, upper = nees_bounds(3, 1, 0.95)
     assert lower == pytest.approx(float(chi2.ppf(0.025, 3)))
@@ -134,6 +174,33 @@ def test_inside_fraction_uses_the_per_step_interval() -> None:
     assert summary.inside_fraction == pytest.approx(0.75)
 
 
+def test_map_consistency_scores_every_identified_landmark(medium_trace: Trace) -> None:
+    summary = map_consistency_summary(medium_trace)
+    assert summary is not None
+    assert summary.degrees_of_freedom == 2
+    assert summary.samples == landmark_error(
+        medium_trace.true_landmarks,
+        medium_trace.estimated_landmarks,
+        medium_trace.slot_to_identity,
+    ).matched
+    assert 0.0 <= summary.inside_fraction <= 1.0
+
+
+def test_map_consistency_is_absent_when_no_landmark_was_ever_seen() -> None:
+    """A run whose detector never fires leaves no map, and nothing to score."""
+    trace = run_simulation(
+        SimulationConfig(
+            steps=40,
+            seed=17,
+            build_grid=False,
+            sensor=RangeBearingParams(max_range=0.01),
+        )
+    )
+    assert trace.final_state.num_landmarks == 0
+    assert map_consistency_summary(trace) is None
+    assert evaluate(trace).map_consistency is None
+
+
 def test_grid_summary_on_a_perfect_map() -> None:
     truth = np.zeros((5, 5), dtype=np.bool_)
     truth[2, 2] = True
@@ -184,6 +251,8 @@ def test_evaluate_reports_every_family_of_metric(medium_trace: Trace) -> None:
     assert result.landmarks.matched > 0
     assert result.consistency.degrees_of_freedom == 3
     assert result.associations.measurements > 0
+    assert result.map_consistency is not None
+    assert result.map_consistency.degrees_of_freedom == 2
 
 
 def test_slam_beats_dead_reckoning_once_the_map_is_built(medium_trace: Trace) -> None:
