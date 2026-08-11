@@ -18,8 +18,15 @@ scaled chi-square with ``3 n`` degrees of freedom, which yields the two-sided
 confidence interval used here. Values above the interval mean the filter is
 optimistic, that is, it reports less uncertainty than it has.
 
-Reference: Bar-Shalom, Li, and Kirubarajan, Estimation with Applications to
-Tracking and Navigation, chapter 5.
+The same test is applied to the map. The two-dimensional error of each landmark
+against the marginal covariance the filter reports for it is chi-square with two
+degrees of freedom, which is what turns the landmark RMSE from an accuracy figure
+into a statement about whether the map uncertainty can be believed.
+
+References: Bar-Shalom, Li, and Kirubarajan, Estimation with Applications to
+Tracking and Navigation, chapter 5, for the pose test and its bounds; Bailey,
+Nieto, Guivant, Stevens, and Nebot, Consistency of the EKF-SLAM Algorithm (2006),
+for the map test.
 """
 
 from __future__ import annotations
@@ -34,6 +41,7 @@ from diffdrive_slam.algorithm.association import AssociationKind
 from diffdrive_slam.model.arrays import BoolArray, FloatArray, wrap_angles
 from diffdrive_slam.model.grid import log_odds_to_probability
 from diffdrive_slam.model.motion import POSE_DIM
+from diffdrive_slam.model.sensor import LANDMARK_DIM
 from diffdrive_slam.pipeline.trace import Trace
 
 __all__ = [
@@ -49,6 +57,8 @@ __all__ = [
     "evaluate",
     "grid_summary",
     "landmark_error",
+    "landmark_nees",
+    "map_consistency_summary",
     "nees_bounds",
     "pose_errors",
     "pose_nees",
@@ -165,6 +175,10 @@ class Evaluation:
     landmarks: LandmarkError
     consistency: ConsistencySummary
     associations: AssociationSummary
+    #: Consistency of the landmark marginals in the final map. It is ``None`` when no
+    #: slot carries a ground truth identity, which needs a run on which the detector
+    #: never fired, since there is then nothing to score.
+    map_consistency: ConsistencySummary | None = None
 
 
 def pose_errors(true_poses: FloatArray, estimated_poses: FloatArray) -> FloatArray:
@@ -241,6 +255,40 @@ def pose_nees(
     return values
 
 
+def landmark_nees(
+    true_landmarks: FloatArray,
+    estimated_landmarks: FloatArray,
+    covariances: FloatArray,
+    slot_to_identity: tuple[int, ...],
+) -> FloatArray:
+    """Return the NEES of every identified landmark, shaped (M,).
+
+    Each value is ``e^T C^-1 e`` for the two-dimensional error ``e`` of one landmark
+    against the ground truth landmark its slot was initialised from, with ``C`` the
+    marginal covariance the filter reports for that slot. Only slots with a recorded
+    identity are scored, so the result is shorter than ``slot_to_identity`` whenever
+    the association policy left a spurious landmark in the map.
+
+    The marginal is used rather than the joint block over the whole map, following
+    Bailey et al. (2006). The joint form yields one number per run instead of one per
+    landmark, and the failure worth detecting is a single landmark whose reported
+    ellipse is too small to contain its own error.
+    """
+    estimated = int(estimated_landmarks.shape[0])
+    if len(slot_to_identity) != estimated:
+        raise ValueError("slot_to_identity must have one entry per estimated landmark")
+    if covariances.shape != (estimated, LANDMARK_DIM, LANDMARK_DIM):
+        raise ValueError(f"covariances must have shape (N, 2, 2), got {covariances.shape}")
+
+    values: list[float] = []
+    for slot, identity in enumerate(slot_to_identity):
+        if identity < 0:
+            continue
+        offset = estimated_landmarks[slot] - true_landmarks[identity]
+        values.append(float(offset @ np.linalg.solve(covariances[slot], offset)))
+    return np.asarray(values, dtype=np.float64)
+
+
 def nees_bounds(
     degrees_of_freedom: int, samples: int, confidence: float = 0.95
 ) -> tuple[float, float]:
@@ -287,6 +335,27 @@ def consistency_summary(
         confidence=confidence,
         inside_fraction=float(inside) / float(nees.size),
     )
+
+
+def map_consistency_summary(trace: Trace, confidence: float = 0.95) -> ConsistencySummary | None:
+    """Summarise the landmark NEES of the final map, or ``None`` if nothing is scorable.
+
+    The samples are the landmarks of one map at one instant rather than a sequence in
+    time, so ``inside_fraction`` counts the landmarks whose own error falls inside the
+    two degree of freedom interval, which is the figure that carries the evidence. The
+    pooled interval over the whole map is reported for completeness and is too tight to
+    test against: the landmarks share the pose error that placed them, so they are far
+    from the independent samples it assumes.
+    """
+    values = landmark_nees(
+        trace.true_landmarks,
+        trace.estimated_landmarks,
+        trace.estimated_landmark_covariances,
+        trace.slot_to_identity,
+    )
+    if values.size == 0:
+        return None
+    return consistency_summary(values, LANDMARK_DIM, confidence)
 
 
 def association_summary(trace: Trace) -> AssociationSummary:
@@ -380,4 +449,5 @@ def evaluate(trace: Trace, confidence: float = 0.95) -> Evaluation:
         ),
         consistency=consistency_summary(nees, POSE_DIM, confidence),
         associations=association_summary(trace),
+        map_consistency=map_consistency_summary(trace, confidence),
     )

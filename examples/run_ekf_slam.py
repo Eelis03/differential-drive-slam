@@ -63,6 +63,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"nominal inside fraction      {summary.confidence:.4f}")
     print(f"pooled bounds (95 percent)   [{summary.lower_bound:.4f}, {summary.upper_bound:.4f}]")
     print(f"verdict on pooled average    {summary.verdict}")
+    if result.map_consistency is not None:
+        map_summary = result.map_consistency
+        print(f"map NEES average             {map_summary.average:.4f}")
+        print(f"map expected value           {map_summary.degrees_of_freedom}")
+        print(
+            f"map per landmark bounds      "
+            f"[{map_summary.per_step_lower:.4f}, {map_summary.per_step_upper:.4f}]"
+        )
+        print(f"landmarks inside map bounds  {map_summary.inside_fraction:.4f}")
+        print(f"verdict on the map           {map_summary.verdict}")
     print("note: the pooled bounds treat the time samples as independent, which they")
     print("      are not; run_consistency_study.py gives the Monte Carlo verdict")
 

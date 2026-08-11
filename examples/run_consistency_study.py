@@ -21,8 +21,10 @@ from diffdrive_slam.analysis.metrics import (
     absolute_trajectory_error,
     consistency_summary,
     landmark_error,
+    landmark_nees,
     pose_nees,
 )
+from diffdrive_slam.model.sensor import LANDMARK_DIM
 from diffdrive_slam.pipeline.simulate import SimulationConfig, run_simulation
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parents[1] / "figures"
@@ -44,6 +46,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
     nees_rows: list[np.ndarray] = []
+    map_nees: list[np.ndarray] = []
     trajectory_rmse: list[float] = []
     landmark_rmse: list[float] = []
     deleted = 0
@@ -63,11 +66,21 @@ def main(argv: list[str] | None = None) -> int:
                 trace.true_landmarks, trace.estimated_landmarks, trace.slot_to_identity
             ).rmse
         )
+        map_nees.append(
+            landmark_nees(
+                trace.true_landmarks,
+                trace.estimated_landmarks,
+                trace.estimated_landmark_covariances,
+                trace.slot_to_identity,
+            )
+        )
         deleted += trace.removed_landmarks
         surplus += trace.final_state.num_landmarks - trace.true_landmarks.shape[0]
 
     ensemble = np.mean(np.asarray(nees_rows, dtype=np.float64), axis=0)
     summary = consistency_summary(ensemble, samples_per_value=args.runs)
+    landmarks = np.concatenate(map_nees)
+    map_summary = consistency_summary(landmarks, LANDMARK_DIM) if landmarks.size else None
 
     print(f"runs                         {args.runs}")
     print(f"steps per run                {args.steps}")
@@ -86,6 +99,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"nominal inside fraction      {summary.confidence:.4f}")
     print(f"pooled bounds (95 percent)   [{summary.lower_bound:.4f}, {summary.upper_bound:.4f}]")
     print(f"verdict on pooled average    {summary.verdict}")
+    if map_summary is not None:
+        print(f"map NEES over all landmarks  {map_summary.average:.4f}")
+        print(f"landmarks scored             {map_summary.samples}")
+        print(f"map expected value           {map_summary.degrees_of_freedom}")
+        print(
+            f"map per landmark bounds      "
+            f"[{map_summary.per_step_lower:.4f}, {map_summary.per_step_upper:.4f}]"
+        )
+        print(f"landmarks inside map bounds  {map_summary.inside_fraction:.4f}")
+        print(f"verdict on the map           {map_summary.verdict}")
     print("note: the per step test is the primary evidence; the pooled bounds assume")
     print("      independence across time steps, which inflates the effective count")
 

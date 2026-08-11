@@ -48,6 +48,12 @@ steps inside per step bounds 0.9688
 nominal inside fraction      0.9500
 pooled bounds (95 percent)   [2.9577, 3.0425]
 verdict on pooled average    conservative
+map NEES over all landmarks  1.9710
+landmarks scored             401
+map expected value           2
+map per landmark bounds      [0.0506, 7.3778]
+landmarks inside map bounds  0.9352
+verdict on the map           consistent
 ```
 
 ![Ensemble NEES over twenty runs plotted against time, staying inside the 95 percent band from 2.02 to 4.16 at almost every time step and sitting slightly below the expected value of three](docs/figures/consistency.png)
@@ -67,6 +73,17 @@ printed for completeness rather than used as the test.
 
 Reading both together: the filter reports very slightly more uncertainty than it has,
 and nowhere reports less. That is the safe direction of error.
+
+The same test applied to the map gives 1.9710 over the 401 landmarks the 20 runs
+recover between them, against an expected value of 2, with 93.5 percent of them
+inside the per landmark interval [0.0506, 7.3778] against a nominal 95 percent. The
+ellipses the filter reports around its landmarks are therefore the right size, which
+the landmark RMSE on its own does not establish: a map that is accurate and a map
+whose covariance is honest are different claims, and a map with an over-confident
+covariance scores the same RMSE while inviting more trust than it has earned. The
+pooled verdict of consistent is printed rather than relied on for the reason given
+above: the landmarks of one run share the single pose error that placed them, so the
+401 samples are no more independent within a run than the 640 time steps are.
 
 This is not a general statement about EKF-SLAM, which is documented to become
 optimistic once the heading uncertainty grows large between loop closures. This
@@ -103,6 +120,11 @@ steps inside per step bounds 0.7941
 nominal inside fraction      0.9500
 pooled bounds (95 percent)   [2.8133, 3.1926]
 verdict on pooled average    conservative
+map NEES average             0.1424
+map expected value           2
+map per landmark bounds      [0.0506, 7.3778]
+landmarks inside map bounds  0.9500
+verdict on the map           conservative
 ```
 
 On this seed the filter cuts the trajectory error by a factor of 9.5 against dead
@@ -114,7 +136,11 @@ This seed is a favourable draw and should be read as an illustration, not as the
 headline. Its trajectory error of 0.054 m is less than half the 0.114 m mean of the
 20-run ensemble above, and its time averaged NEES of 1.07 is far below the ensemble
 figure of 2.90 because a single 640-step run is nowhere near 640 independent samples.
-The ensemble numbers are the ones that carry information.
+Its map NEES of 0.14 against the ensemble figure of 1.97 has a sharper version of the
+same cause: a landmark's absolute uncertainty cannot fall below that of the pose the
+map is anchored to, so the 20 landmarks of one run are all scored against one draw of
+the initial pose error, and on this seed that draw was a small one. The ensemble
+numbers are the ones that carry information.
 
 ### Can the correspondences be recovered from the measurements alone
 
@@ -304,7 +330,7 @@ the limitation is gone.
 | `src/diffdrive_slam/pipeline/trajectory.py` | Open-loop control sequences: closed square loop and figure eight |
 | `src/diffdrive_slam/pipeline/simulate.py` | The run loop: noisy control and measurement generation, filter driving, grid mapping |
 | `src/diffdrive_slam/pipeline/trace.py` | The structured record of a run, with ground truth and per-step association detail |
-| `src/diffdrive_slam/analysis/metrics.py` | Trajectory error, landmark RMSE, NEES and chi-square bounds, association and grid scoring |
+| `src/diffdrive_slam/analysis/metrics.py` | Trajectory error, landmark RMSE, pose and map NEES with chi-square bounds, association and grid scoring |
 | `src/diffdrive_slam/analysis/figures.py` | Trajectory, error history, NEES, and occupancy grid figures |
 
 The dependency direction is strictly `model` to `algorithm` to `pipeline` to
@@ -422,7 +448,7 @@ uv run mypy
 uv run pytest --cov=src/diffdrive_slam --cov-report=term-missing
 ```
 
-221 tests run in about 20 seconds and cover 99 percent of the package. CI fails the
+227 tests run in about 20 seconds and cover 99 percent of the package. CI fails the
 build below 97 percent. The suite has three tiers.
 
 The first tier checks the mathematics: that the motion model integrates a straight
