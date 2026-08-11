@@ -57,8 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"time averaged NEES           {summary.average:.4f}")
     print(f"expected value               {summary.degrees_of_freedom}")
     print(
-        f"per step bounds (95 percent) "
-        f"[{summary.per_step_lower:.4f}, {summary.per_step_upper:.4f}]"
+        f"per step bounds (95 percent) [{summary.per_step_lower:.4f}, {summary.per_step_upper:.4f}]"
     )
     print(f"steps inside per step bounds {summary.inside_fraction:.4f}")
     print(f"nominal inside fraction      {summary.confidence:.4f}")

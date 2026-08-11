@@ -200,17 +200,13 @@ class EkfSlam:
         """Propagate the belief through the motion model for one interval."""
         pose = self._state.robot_pose
         jacobian = motion_jacobian_state(pose, control, dt)
-        process_noise = process_noise_covariance(
-            pose, control, dt, self._config.motion_noise
-        )
+        process_noise = process_noise_covariance(pose, control, dt, self._config.motion_noise)
 
         self._state.mean[:POSE_DIM] = predict_pose(pose, control, dt)
 
         covariance = self._state.covariance
         robot_block = covariance[:POSE_DIM, :POSE_DIM]
-        covariance[:POSE_DIM, :POSE_DIM] = (
-            jacobian @ robot_block @ jacobian.T + process_noise
-        )
+        covariance[:POSE_DIM, :POSE_DIM] = jacobian @ robot_block @ jacobian.T + process_noise
         if self._state.num_landmarks:
             cross = jacobian @ covariance[:POSE_DIM, POSE_DIM:]
             covariance[:POSE_DIM, POSE_DIM:] = cross
@@ -232,9 +228,7 @@ class EkfSlam:
         jacobian[:, state.landmark_slice(landmark_index)] = landmark_jacobian
 
         covariance = jacobian @ state.covariance @ jacobian.T + self._measurement_covariance
-        return Innovation(
-            residual=residual, jacobian=jacobian, covariance=symmetrise(covariance)
-        )
+        return Innovation(residual=residual, jacobian=jacobian, covariance=symmetrise(covariance))
 
     def update(self, measurement: FloatArray, landmark_index: int) -> Innovation:
         """Correct the belief with one measurement of a known landmark."""
@@ -251,10 +245,7 @@ class EkfSlam:
 
         identity = np.eye(state.dimension, dtype=np.float64)
         factor = identity - gain @ jacobian
-        joseph = (
-            factor @ covariance @ factor.T
-            + gain @ self._measurement_covariance @ gain.T
-        )
+        joseph = factor @ covariance @ factor.T + gain @ self._measurement_covariance @ gain.T
         state.covariance = symmetrise(joseph)
         return innovation
 
@@ -309,9 +300,7 @@ class EkfSlam:
             candidates.append(
                 Candidate(
                     landmark_index=index,
-                    mahalanobis=mahalanobis_squared(
-                        innovation.residual, innovation.covariance
-                    ),
+                    mahalanobis=mahalanobis_squared(innovation.residual, innovation.covariance),
                     log_likelihood_cost=negative_log_likelihood(
                         innovation.residual, innovation.covariance
                     ),

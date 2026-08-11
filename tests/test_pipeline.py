@@ -53,9 +53,7 @@ def test_range_scan_saturates_at_the_maximum_range() -> None:
 
 
 def test_range_scan_respects_the_heading() -> None:
-    environment = Environment(
-        landmarks=np.zeros((0, 2)), walls=np.array([[1.0, -5.0, 1.0, 5.0]])
-    )
+    environment = Environment(landmarks=np.zeros((0, 2)), walls=np.array([[1.0, -5.0, 1.0, 5.0]]))
     forward = environment.range_scan(np.array([0.0, 0.0, 0.0]), np.array([0.0]), 10.0)
     backward = environment.range_scan(np.array([0.0, 0.0, np.pi]), np.array([0.0]), 10.0)
     assert float(forward[0]) == pytest.approx(1.0)
@@ -210,9 +208,7 @@ def test_landmark_count_moves_only_by_recorded_decisions(short_trace: Trace) -> 
     assert int(counts[-1]) == short_trace.final_state.num_landmarks
     for previous, step in pairwise(short_trace.steps):
         created = sum(
-            1
-            for association in step.associations
-            if association.kind is AssociationKind.NEW
+            1 for association in step.associations if association.kind is AssociationKind.NEW
         )
         removed = len(step.removed_landmarks)
         assert step.num_landmarks == previous.num_landmarks + created - removed
@@ -235,9 +231,7 @@ def test_grid_mapping_does_not_perturb_the_trajectory() -> None:
     without = run_simulation(SimulationConfig(steps=60, seed=31, build_grid=False))
     with_grid = run_simulation(SimulationConfig(steps=60, seed=31, build_grid=True))
     np.testing.assert_allclose(without.true_poses, with_grid.true_poses, atol=0.0)
-    np.testing.assert_allclose(
-        without.estimated_poses, with_grid.estimated_poses, atol=0.0
-    )
+    np.testing.assert_allclose(without.estimated_poses, with_grid.estimated_poses, atol=0.0)
 
 
 def test_different_seeds_give_different_runs() -> None:

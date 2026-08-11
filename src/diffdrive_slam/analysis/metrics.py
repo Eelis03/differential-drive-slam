@@ -170,9 +170,7 @@ class Evaluation:
 def pose_errors(true_poses: FloatArray, estimated_poses: FloatArray) -> FloatArray:
     """Return the pose error ``true - estimated`` with the heading wrapped."""
     if true_poses.shape != estimated_poses.shape:
-        raise ValueError(
-            f"shapes must match, got {true_poses.shape} and {estimated_poses.shape}"
-        )
+        raise ValueError(f"shapes must match, got {true_poses.shape} and {estimated_poses.shape}")
     if true_poses.ndim != 2 or true_poses.shape[1] != POSE_DIM:
         raise ValueError(f"poses must have shape (T, 3), got {true_poses.shape}")
     errors = np.asarray(true_poses - estimated_poses, dtype=np.float64).copy()
@@ -218,8 +216,9 @@ def landmark_error(
         squared.append(float(offset @ offset))
 
     if not squared:
-        return LandmarkError(estimated=estimated, matched=0, rmse=float("nan"),
-                             maximum=float("nan"))
+        return LandmarkError(
+            estimated=estimated, matched=0, rmse=float("nan"), maximum=float("nan")
+        )
     values = np.asarray(squared, dtype=np.float64)
     return LandmarkError(
         estimated=estimated,
@@ -235,9 +234,7 @@ def pose_nees(
     """Return the NEES of the pose error at every step, shaped (T,)."""
     errors = pose_errors(true_poses, estimated_poses)
     if covariances.shape != (errors.shape[0], POSE_DIM, POSE_DIM):
-        raise ValueError(
-            f"covariances must have shape (T, 3, 3), got {covariances.shape}"
-        )
+        raise ValueError(f"covariances must have shape (T, 3, 3), got {covariances.shape}")
     values = np.empty(errors.shape[0], dtype=np.float64)
     for index, (error, covariance) in enumerate(zip(errors, covariances, strict=True)):
         values[index] = float(error @ np.linalg.solve(covariance, error))
@@ -338,9 +335,7 @@ def grid_summary(
     penalised.
     """
     if log_odds.shape != truth_occupied.shape:
-        raise ValueError(
-            f"shapes must match, got {log_odds.shape} and {truth_occupied.shape}"
-        )
+        raise ValueError(f"shapes must match, got {log_odds.shape} and {truth_occupied.shape}")
     if not 0.0 < free_threshold < occupied_threshold < 1.0:
         raise ValueError("thresholds must satisfy 0 < free < occupied < 1")
     if tolerance_cells < 0:
@@ -367,9 +362,7 @@ def grid_summary(
         occupied=occupied_count,
         free=free_count,
         unknown=int(log_odds.size) - occupied_count - free_count,
-        occupied_agreement=(
-            occupied_correct / occupied_count if occupied_count else float("nan")
-        ),
+        occupied_agreement=(occupied_correct / occupied_count if occupied_count else float("nan")),
         free_agreement=free_correct / free_count if free_count else float("nan"),
         tolerance_cells=tolerance_cells,
     )

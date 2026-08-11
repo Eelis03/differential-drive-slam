@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Differential Drive SLAM"
+abstract: >-
+  EKF-SLAM with maximum likelihood landmark association and log-odds occupancy
+  grid mapping for a simulated differential drive robot, evaluated against
+  ground truth for the consistency of its reported covariance rather than only
+  for its accuracy.
+type: software
+authors:
+  - family-names: Yilmaz
+    given-names: Emre
+repository-code: "https://github.com/Eelis03/differential-drive-slam"
+license: MIT
+version: "0.1.0"
+date-released: "2026-08-11"
+keywords:
+  - robotics
+  - slam
+  - ekf
+  - occupancy-grid
+  - python

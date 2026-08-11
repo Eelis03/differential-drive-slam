@@ -187,12 +187,8 @@ def motion_jacobian_control(pose: FloatArray, control: Control, dt: float) -> Fl
 
     jacobian[0, 0] = (sin_next - sin_theta) / angular
     jacobian[1, 0] = (cos_theta - cos_next) / angular
-    jacobian[0, 1] = (
-        linear * (sin_theta - sin_next) / angular**2 + linear * dt * cos_next / angular
-    )
-    jacobian[1, 1] = (
-        linear * (cos_next - cos_theta) / angular**2 + linear * dt * sin_next / angular
-    )
+    jacobian[0, 1] = linear * (sin_theta - sin_next) / angular**2 + linear * dt * cos_next / angular
+    jacobian[1, 1] = linear * (cos_next - cos_theta) / angular**2 + linear * dt * sin_next / angular
     return jacobian
 
 

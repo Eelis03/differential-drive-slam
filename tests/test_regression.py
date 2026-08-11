@@ -41,9 +41,7 @@ def replayed() -> dict[str, object]:
     return {
         "trace": trace,
         "evaluation": evaluate(trace),
-        "grid": grid_summary(
-            trace.occupancy_log_odds, environment.rasterise_walls(trace.grid)
-        ),
+        "grid": grid_summary(trace.occupancy_log_odds, environment.rasterise_walls(trace.grid)),
     }
 
 
@@ -102,9 +100,7 @@ def test_metrics_match_the_reference(
         reference["dead_reckoning_rmse"], abs=TOLERANCE
     )
     assert result.landmarks.rmse == pytest.approx(reference["landmark_rmse"], abs=TOLERANCE)
-    assert result.consistency.average == pytest.approx(
-        reference["average_nees"], abs=TOLERANCE
-    )
+    assert result.consistency.average == pytest.approx(reference["average_nees"], abs=TOLERANCE)
 
 
 def test_association_counts_match_the_reference(

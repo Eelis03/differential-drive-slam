@@ -138,8 +138,6 @@ def test_lower_resolution_produces_a_smaller_file(short_trace: Trace, tmp_path: 
     assert coarse.stat().st_size < fine.stat().st_size
 
 
-def test_save_figure_rejects_a_non_positive_resolution(
-    short_trace: Trace, tmp_path: Path
-) -> None:
+def test_save_figure_rejects_a_non_positive_resolution(short_trace: Trace, tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="dpi must be positive"):
         save_figure(plot_trajectory(short_trace), tmp_path / "bad.png", dpi=0)

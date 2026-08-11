@@ -49,9 +49,7 @@ class Environment:
         deltas = self.landmarks - np.asarray(pose[:2], dtype=np.float64)
         ranges = np.hypot(deltas[:, 0], deltas[:, 1])
         bearings = wrap_angles(np.arctan2(deltas[:, 1], deltas[:, 0]) - float(pose[2]))
-        visible = (ranges <= params.max_range) & (
-            np.abs(bearings) <= 0.5 * params.field_of_view
-        )
+        visible = (ranges <= params.max_range) & (np.abs(bearings) <= 0.5 * params.field_of_view)
         identities = np.asarray(np.flatnonzero(visible), dtype=np.int64)
         measurements = np.stack([ranges[visible], bearings[visible]], axis=1)
         return identities, np.asarray(measurements, dtype=np.float64)
@@ -72,15 +70,13 @@ class Environment:
         relative = starts - origin
 
         denominator = (
-            directions[:, None, 0] * spans[None, :, 1]
-            - directions[:, None, 1] * spans[None, :, 0]
+            directions[:, None, 0] * spans[None, :, 1] - directions[:, None, 1] * spans[None, :, 0]
         )
         parallel = np.abs(denominator) < 1e-12
         safe = np.where(parallel, 1.0, denominator)
 
         along_ray = (
-            relative[None, :, 0] * spans[None, :, 1]
-            - relative[None, :, 1] * spans[None, :, 0]
+            relative[None, :, 0] * spans[None, :, 1] - relative[None, :, 1] * spans[None, :, 0]
         ) / safe
         along_wall = (
             relative[None, :, 0] * directions[:, None, 1]
@@ -116,9 +112,7 @@ class Environment:
         return occupied
 
 
-def rectangle_segments(
-    x_min: float, y_min: float, x_max: float, y_max: float
-) -> FloatArray:
+def rectangle_segments(x_min: float, y_min: float, x_max: float, y_max: float) -> FloatArray:
     """Return the four wall segments of an axis-aligned rectangle."""
     return np.array(
         [

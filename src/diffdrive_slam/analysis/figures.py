@@ -121,9 +121,7 @@ def plot_error_history(trace: Trace) -> Figure:
     times = trace.times
     true_poses = trace.true_poses
     slam_error = np.linalg.norm(true_poses[:, :2] - trace.estimated_poses[:, :2], axis=1)
-    odometry_error = np.linalg.norm(
-        true_poses[:, :2] - trace.dead_reckoned_poses[:, :2], axis=1
-    )
+    odometry_error = np.linalg.norm(true_poses[:, :2] - trace.dead_reckoned_poses[:, :2], axis=1)
 
     figure, axes = plt.subplots(2, 1, figsize=(7.0, 5.0), sharex=True)
     axes[0].plot(times, odometry_error, color="tab:orange", lw=1.0, label="dead reckoning")
@@ -151,9 +149,7 @@ def plot_nees(times: FloatArray, nees: FloatArray, summary: ConsistencySummary) 
     percent = round(100.0 * summary.confidence)
     figure, axes = plt.subplots(figsize=(7.0, 3.6))
     axes.plot(times, nees, color="tab:blue", lw=0.9, label="NEES")
-    axes.axhline(
-        summary.degrees_of_freedom, color="black", lw=1.0, ls="-", label="expected value"
-    )
+    axes.axhline(summary.degrees_of_freedom, color="black", lw=1.0, ls="-", label="expected value")
     axes.axhline(
         summary.per_step_lower,
         color="tab:red",

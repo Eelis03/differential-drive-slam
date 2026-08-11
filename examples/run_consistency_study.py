@@ -51,14 +51,10 @@ def main(argv: list[str] | None = None) -> int:
     times = np.zeros(0, dtype=np.float64)
 
     for index in range(args.runs):
-        config = SimulationConfig(
-            steps=args.steps, seed=args.seed + index, build_grid=False
-        )
+        config = SimulationConfig(steps=args.steps, seed=args.seed + index, build_grid=False)
         trace = run_simulation(config)
         times = trace.times
-        nees_rows.append(
-            pose_nees(trace.true_poses, trace.estimated_poses, trace.pose_covariances)
-        )
+        nees_rows.append(pose_nees(trace.true_poses, trace.estimated_poses, trace.pose_covariances))
         trajectory_rmse.append(
             absolute_trajectory_error(trace.true_poses, trace.estimated_poses).position_rmse
         )
@@ -84,8 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"ensemble average NEES        {summary.average:.4f}")
     print(f"expected value               {summary.degrees_of_freedom}")
     print(
-        f"per step bounds (95 percent) "
-        f"[{summary.per_step_lower:.4f}, {summary.per_step_upper:.4f}]"
+        f"per step bounds (95 percent) [{summary.per_step_lower:.4f}, {summary.per_step_upper:.4f}]"
     )
     print(f"steps inside per step bounds {summary.inside_fraction:.4f}")
     print(f"nominal inside fraction      {summary.confidence:.4f}")
@@ -97,9 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.no_figures:
         from diffdrive_slam.analysis.figures import plot_nees, save_figure
 
-        save_figure(
-            plot_nees(times, ensemble, summary), args.output / "consistency_nees.png"
-        )
+        save_figure(plot_nees(times, ensemble, summary), args.output / "consistency_nees.png")
         print(f"figures written to           {args.output}")
 
     return 0

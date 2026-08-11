@@ -61,9 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     mapped = run_simulation(
         SimulationConfig(steps=args.steps, seed=args.seed, build_grid=True), environment
     )
-    save_figure(
-        plot_trajectory(mapped), args.output / "trajectory.png", dpi=args.dpi
-    )
+    save_figure(plot_trajectory(mapped), args.output / "trajectory.png", dpi=args.dpi)
     save_figure(
         plot_occupancy_grid(mapped, environment.walls),
         args.output / "occupancy_grid.png",
@@ -81,9 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         rows.append(pose_nees(trace.true_poses, trace.estimated_poses, trace.pose_covariances))
     ensemble = np.mean(np.asarray(rows, dtype=np.float64), axis=0)
     summary = consistency_summary(ensemble, samples_per_value=args.runs)
-    save_figure(
-        plot_nees(times, ensemble, summary), args.output / "consistency.png", dpi=args.dpi
-    )
+    save_figure(plot_nees(times, ensemble, summary), args.output / "consistency.png", dpi=args.dpi)
 
     total = sum(path.stat().st_size for path in sorted(args.output.glob("*.png")))
     for path in sorted(args.output.glob("*.png")):
