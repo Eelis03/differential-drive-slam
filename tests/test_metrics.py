@@ -176,11 +176,14 @@ def test_map_consistency_scores_every_identified_landmark(medium_trace: Trace) -
     summary = map_consistency_summary(medium_trace)
     assert summary is not None
     assert summary.degrees_of_freedom == 2
-    assert summary.samples == landmark_error(
-        medium_trace.true_landmarks,
-        medium_trace.estimated_landmarks,
-        medium_trace.slot_to_identity,
-    ).matched
+    assert (
+        summary.samples
+        == landmark_error(
+            medium_trace.true_landmarks,
+            medium_trace.estimated_landmarks,
+            medium_trace.slot_to_identity,
+        ).matched
+    )
     assert 0.0 <= summary.inside_fraction <= 1.0
 
 

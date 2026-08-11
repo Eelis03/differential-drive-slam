@@ -337,9 +337,7 @@ def consistency_summary(
     )
 
 
-def map_consistency_summary(
-    trace: Trace, confidence: float = 0.95
-) -> ConsistencySummary | None:
+def map_consistency_summary(trace: Trace, confidence: float = 0.95) -> ConsistencySummary | None:
     """Summarise the landmark NEES of the final map, or ``None`` if nothing is scorable.
 
     The samples are the landmarks of one map at one instant rather than a sequence in

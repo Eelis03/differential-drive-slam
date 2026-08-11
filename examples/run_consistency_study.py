@@ -80,9 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     ensemble = np.mean(np.asarray(nees_rows, dtype=np.float64), axis=0)
     summary = consistency_summary(ensemble, samples_per_value=args.runs)
     landmarks = np.concatenate(map_nees)
-    map_summary = (
-        consistency_summary(landmarks, LANDMARK_DIM) if landmarks.size else None
-    )
+    map_summary = consistency_summary(landmarks, LANDMARK_DIM) if landmarks.size else None
 
     print(f"runs                         {args.runs}")
     print(f"steps per run                {args.steps}")
