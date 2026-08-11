@@ -4,7 +4,7 @@ EKF-SLAM with landmark association and occupancy grid mapping for a simulated
 differential drive robot, evaluated for consistency rather than only for accuracy.
 
 [![CI](https://github.com/Eelis03/differential-drive-slam/actions/workflows/ci.yml/badge.svg)](https://github.com/Eelis03/differential-drive-slam/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.12%20%7C%203.13-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 ![Estimated trajectory tracking ground truth around a closed square loop while the dead reckoned path drifts about one metre away from it, with 95 percent covariance ellipses drawn around all twenty estimated landmarks](docs/figures/trajectory.png)
@@ -363,7 +363,9 @@ which it bites, in [docs/design-notes.md](docs/design-notes.md).
 
 ## Installation
 
-Requires Python 3.12 or later.
+Requires Python 3.12 or later. CI runs the whole suite on 3.12 and 3.13, on Linux and
+on Windows, so the version floor in `pyproject.toml` is a tested claim rather than a
+declared one.
 
 ```bash
 git clone https://github.com/Eelis03/differential-drive-slam.git
@@ -441,6 +443,7 @@ on the series and the geometry each figure carries rather than on its pixels.
 ```bash
 uv run pytest
 uv run ruff check .
+uv run ruff format --check .
 uv run mypy
 uv run pytest --cov=src/diffdrive_slam --cov-report=term-missing
 ```

@@ -76,9 +76,7 @@ class GridSpec:
 
     def mask_inside(self, columns: IntArray, rows: IntArray) -> IntArray:
         """Return the indices of ``(columns, rows)`` pairs that lie inside the grid."""
-        inside = (
-            (columns >= 0) & (columns < self.width) & (rows >= 0) & (rows < self.height)
-        )
+        inside = (columns >= 0) & (columns < self.width) & (rows >= 0) & (rows < self.height)
         return np.asarray(np.flatnonzero(inside), dtype=np.int64)
 
 

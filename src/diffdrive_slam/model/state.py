@@ -118,9 +118,7 @@ class SlamState:
         keep[block] = False
         return SlamState(
             mean=np.asarray(self.mean[keep], dtype=np.float64).copy(),
-            covariance=np.asarray(
-                self.covariance[np.ix_(keep, keep)], dtype=np.float64
-            ).copy(),
+            covariance=np.asarray(self.covariance[np.ix_(keep, keep)], dtype=np.float64).copy(),
         )
 
     def copy(self) -> SlamState:

@@ -80,9 +80,7 @@ def test_marginalising_a_landmark_keeps_the_surviving_block_exactly() -> None:
 def test_marginalising_preserves_the_cross_correlations_of_the_survivors() -> None:
     state = random_state(landmarks=3, seed=2)
     reduced = state.without_landmark(0)
-    np.testing.assert_array_equal(
-        reduced.covariance[:3, 3:5], state.covariance[:3, 5:7]
-    )
+    np.testing.assert_array_equal(reduced.covariance[:3, 3:5], state.covariance[:3, 5:7])
     np.testing.assert_array_equal(reduced.landmark(1), state.landmark(2))
 
 

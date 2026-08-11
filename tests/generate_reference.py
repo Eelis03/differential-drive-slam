@@ -31,9 +31,7 @@ def build_reference() -> dict[str, object]:
         raise RuntimeError("the reference configuration must build an occupancy grid")
 
     result = evaluate(trace)
-    grid = grid_summary(
-        trace.occupancy_log_odds, environment.rasterise_walls(trace.grid)
-    )
+    grid = grid_summary(trace.occupancy_log_odds, environment.rasterise_walls(trace.grid))
     return {
         "steps": REFERENCE_CONFIG.steps,
         "seed": REFERENCE_CONFIG.seed,

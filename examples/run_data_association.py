@@ -76,9 +76,7 @@ def main(argv: list[str] | None = None) -> int:
         landmarks = float(np.mean([item.landmarks.rmse for item in evaluations]))
         count = float(np.mean([item.landmarks.estimated for item in evaluations]))
         incorrect = int(sum(item.associations.incorrect for item in evaluations))
-        print(
-            f"{label:<22}{trajectory:>14.4f}{landmarks:>20.4f}{count:>12.1f}{incorrect:>11d}"
-        )
+        print(f"{label:<22}{trajectory:>14.4f}{landmarks:>20.4f}{count:>12.1f}{incorrect:>11d}")
 
     managed = rows[MAXIMUM_LIKELIHOOD]
     rejected = int(sum(item.associations.rejected for _, item in managed))

@@ -32,9 +32,7 @@ def build_filter(sigma_range: float = 0.05, sigma_bearing: float = 0.01) -> EkfS
             sigma_range=sigma_range, sigma_bearing=sigma_bearing, max_range=10.0
         ),
     )
-    return EkfSlam(
-        np.zeros(3), np.diag([1e-4, 1e-4, 1e-5]), config
-    )
+    return EkfSlam(np.zeros(3), np.diag([1e-4, 1e-4, 1e-5]), config)
 
 
 def test_initial_state_holds_only_the_pose() -> None:

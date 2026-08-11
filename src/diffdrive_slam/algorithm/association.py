@@ -124,9 +124,7 @@ def associate(
         )
 
     nearest = min(candidates, key=lambda candidate: candidate.mahalanobis)
-    accepted = [
-        candidate for candidate in candidates if candidate.mahalanobis <= acceptance_gate
-    ]
+    accepted = [candidate for candidate in candidates if candidate.mahalanobis <= acceptance_gate]
     if accepted:
         best = min(accepted, key=lambda candidate: candidate.log_likelihood_cost)
         return Association(

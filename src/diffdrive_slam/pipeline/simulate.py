@@ -144,8 +144,7 @@ def run_simulation(
     )
 
     motion_rng, landmark_rng, scan_rng = (
-        np.random.default_rng(child)
-        for child in np.random.SeedSequence(settings.seed).spawn(3)
+        np.random.default_rng(child) for child in np.random.SeedSequence(settings.seed).spawn(3)
     )
     controls = repeat_to_length(
         square_loop_controls(
@@ -171,9 +170,7 @@ def run_simulation(
     )
     slam = EkfSlam(nominal_pose, initial_covariance, filter_config)
 
-    mapper = (
-        OccupancyGridMapper(settings.grid, settings.log_odds) if settings.build_grid else None
-    )
+    mapper = OccupancyGridMapper(settings.grid, settings.log_odds) if settings.build_grid else None
     scan_bearings = np.linspace(
         -np.pi, np.pi, settings.scan_beams, endpoint=False, dtype=np.float64
     )
@@ -254,9 +251,7 @@ def run_simulation(
             )
         )
 
-    ordered_identities = tuple(
-        slot_to_identity.get(slot, -1) for slot in range(slam.num_landmarks)
-    )
+    ordered_identities = tuple(slot_to_identity.get(slot, -1) for slot in range(slam.num_landmarks))
     return Trace(
         steps=tuple(records),
         true_landmarks=world.landmarks.copy(),

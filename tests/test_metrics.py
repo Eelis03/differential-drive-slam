@@ -141,9 +141,7 @@ def test_nees_bounds_reject_invalid_arguments() -> None:
 
 def test_consistency_verdicts() -> None:
     rng = np.random.default_rng(0)
-    consistent = consistency_summary(
-        np.asarray(rng.chisquare(3, size=4000), dtype=np.float64)
-    )
+    consistent = consistency_summary(np.asarray(rng.chisquare(3, size=4000), dtype=np.float64))
     assert consistent.verdict == "consistent"
     assert consistent.consistent
 

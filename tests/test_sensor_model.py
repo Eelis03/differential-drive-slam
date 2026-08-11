@@ -92,9 +92,7 @@ def test_inverse_observation_jacobians_match_finite_differences(
 ) -> None:
     measurement = observe(pose, landmark)
     analytic_pose, analytic_measurement = inverse_observation_jacobians(pose, measurement)
-    numeric_pose = central_difference(
-        lambda value: inverse_observation(value, measurement), pose
-    )
+    numeric_pose = central_difference(lambda value: inverse_observation(value, measurement), pose)
     numeric_measurement = central_difference(
         lambda value: inverse_observation(pose, value), measurement
     )

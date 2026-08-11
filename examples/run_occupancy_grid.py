@@ -45,8 +45,10 @@ def main(argv: list[str] | None = None) -> int:
     params = config.log_odds
 
     print(f"steps                        {len(trace) - 1}")
-    print(f"grid                         {trace.grid.width} x {trace.grid.height} cells "
-          f"at {trace.grid.resolution:.2f} m")
+    print(
+        f"grid                         {trace.grid.width} x {trace.grid.height} cells "
+        f"at {trace.grid.resolution:.2f} m"
+    )
     print(f"beams per scan               {config.scan_beams}")
     print(f"scan interval [steps]        {config.scan_interval}")
     print(f"log odds bounds              [{params.minimum:.1f}, {params.maximum:.1f}]")
